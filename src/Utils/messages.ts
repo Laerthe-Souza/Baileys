@@ -867,13 +867,24 @@ export const downloadMediaMessage = async(
 		}
 
 		const stream = await downloadContentFromMessage(download, mediaType, options)
-		if(type === 'buffer') {
-			const bufferArray: Buffer[] = []
-			for await (const chunk of stream) {
-				bufferArray.push(chunk)
-			}
 
-			return Buffer.concat(bufferArray)
+		if(type === 'buffer') {
+			
+			const buffer = await new Promise((resolve, reject) => {
+				const bufferArray: Buffer[] = []
+
+				stream.on('data', chunks => {
+					bufferArray.push(chunks)
+				}).on('end', () => {
+					resolve(Buffer.concat(bufferArray))
+				}).on('error', error => {
+					reject(error)
+				})
+			}).catch(error => {
+				throw new Boom('Error on read decrypt media stream', { statusCode: 400, message: error.message })
+			})
+
+			return buffer
 		}
 
 		return stream
